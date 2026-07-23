@@ -8,7 +8,32 @@
 
 4. `sudo apt install vim tree net-tools iputils-ping software-properties-common -y`
 
-5. 开启root登录,方便传代码
+5. 同步时间 
+
+   ```
+   timedatectl set-timezone Asia/Shanghai
+   apt install ntpdate -y
+   ntpdate ntp.aliyun.com
+   hwclock -w
+   设置24小时时间
+   vim /etc/default/locale
+   添加
+   LANG=en_US.UTF-8
+   LC_TIME=en_DK.UTF-8
+   ```
+
+6. 删除snap服务
+
+   ```
+   snap list
+   snap remove lxd
+   snap remove core20
+   snap remove snapd
+   systemctl stop snapd
+   apt remove snapd -y
+   ```
+
+7. 开启root登录,方便传代码
 
    ```
    修改/etc/ssh/ssd_config
@@ -17,7 +42,7 @@
    设置root的密码: passwd root
    ```
 
-6. 修改网卡等待时间:
+8. 修改网卡等待时间:
 
    ```
    vim /etc/systemd/system/network-online.target.wants/systemd-networkd-wait-online.service 
@@ -25,7 +50,7 @@
    systemctl daemon-reload
    ```
 
-7. 修改pip为国内源
+9. 修改pip为国内源
 
    ```
    1. 在/home/linux下创建.pip文件夹与pip.conf文件
@@ -39,7 +64,7 @@
    5. cp /home/linux/.pip/pip.conf /root/.pip/pip.conf
    ```
 
-8. 安装zerotier
+10. 安装zerotier
 
    ```
    curl -s https://install.zerotier.com | sudo bash
@@ -53,37 +78,37 @@
    systemctl restart zerotier-one
    ```
 
-9. 安装软raid
+11. 安装软raid
 
-   ```
-   1. apt install mdadm quota
-   2. 检查磁盘状态,确认哪些磁盘未被使用，例如 `/dev/sdb /dev/sdc /dev/sdd`
-   	lsblk
-   	fdisk -l
-   3. 清除磁盘旧配置
-   	sudo mdadm --zero-superblock /dev/sd[b-d]
-   4. 创建raid阵列
-   	sudo mdadm --create --verbose /dev/md0 --level=10 --raid-devices=4 /dev/sd[b-e]
-   5. 创建文件系统并挂载
-   	sudo mkfs.ext4 -O project,quota /dev/md0
-   	sudo mkdir -p /mnt/raid
-   	sudo mount /dev/md0 /mnt/raid
-   6. 持久化配置
-   	sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf
-   	sudo update-initramfs -u
-   7. 添加到 `/etc/fstab`：
-   	echo '/dev/md0 /mnt/raid ext4 defaults,nofail,discard,prjquota 0 0' | sudo tee -a /etc/fstab
-   8.  开启磁盘路径配额
-   	quotaon -P /mnt/raid
-   9. 查看是否开启磁盘路径配额
-   	quotaon -Ppv /mnt/raid
-   ```
+    ```
+    1. apt install mdadm quota
+    2. 检查磁盘状态,确认哪些磁盘未被使用，例如 `/dev/sdb /dev/sdc /dev/sdd`
+    	lsblk
+    	fdisk -l
+    3. 清除磁盘旧配置
+    	sudo mdadm --zero-superblock /dev/sd[b-d]
+    4. 创建raid阵列
+    	sudo mdadm --create --verbose /dev/md0 --level=10 --raid-devices=4 /dev/sd[b-e]
+    5. 创建文件系统并挂载
+    	sudo mkfs.ext4 -O project,quota /dev/md0
+    	sudo mkdir -p /mnt/raid
+    	sudo mount /dev/md0 /mnt/raid
+    6. 持久化配置
+    	sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf
+    	sudo update-initramfs -u
+    7. 添加到 `/etc/fstab`：
+    	echo '/dev/md0 /mnt/raid ext4 defaults,nofail,discard,prjquota 0 0' | sudo tee -a /etc/fstab
+    8.  开启磁盘路径配额
+    	quotaon -P /mnt/raid
+    9. 查看是否开启磁盘路径配额
+    	quotaon -Ppv /mnt/raid
+    ```
 
-10. 安装smartctl
+12. 安装smartctl
 
    ```
    apt install g++ gcc make -y
-   tar -zxvf smartmontools-7.5.tar.gz
+   tar -zxvf https://rowsea.com/smartmontools-7.5.tar.gz
    cd smartmontools-7.5
    ./configure --disable-dependency-tracking
    make && make install
@@ -131,17 +156,17 @@
        ;full_audit:syslog = true
        ;full_audit:success = create_file mkdirat renameat mknodat unlinkat pwrite_recv pwrite_send pread_recv pread_send
        include = /etc/samba/users/%U.share.conf
-       以下解决中文乱码
-       dos charset = UTF-8
-       unix charset = utf-8
-       display charset = utf-8
+       ;以下解决中文乱码
+       ;dos charset = UTF-8
+       ;unix charset = utf-8
+       ;display charset = utf-8
     ```
 
 13. 安装supervisor,开启python服务
 
     ```
     apt install python3-pip python3-flask supervisor -y
-    systemc	enable supervisor
+    systemctl enable supervisor
     
     修改vim /etc/supervisor/conf.d/pysmb.conf
     [program:pysmb]
@@ -257,6 +282,7 @@
 18. 安装ttyd服务
 
     ```
+    wget https://rowsea.com/ttyd.x86_64
     mv ttyd.x86_64 /usr/local/bin/ttyd
     chmod -R 755 /usr/local/bin/ttyd 
     /usr/local/bin/ttyd -W -p 8082 login
@@ -320,5 +346,58 @@
     systemctl start static-route
     ```
 
-21. 
+21. 安装redis
+
+    ```
+    apt-get purge --auto-remove redis redis-server
+    apt install redis-server
+    systemctl enable redis
+    #systemctl stop redis
+    #修改redis存储路径
+    #vim /etc/redis/redis.conf
+    #找到 dir /var/lib/redis
+    #修改为 /mnt/raid/redis_data
+    #同步数据
+    #rsync -avz /var/lib/redis /mnt/raid/redis_data/
+    #chown -R redis:redis /mnt/raid/redis_data/
+    #重启redis
+    systemctl restart redis.service
+    ```
+
+22. 安装mysql 5.7
+
+    ```
+    vim /etc/apt/sources.list.d/mysql.list
+    
+    deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-apt-config
+    deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-5.7
+    deb http://repo.mysql.com/apt/ubuntu/ bionic mysql-tools
+    deb-src http://repo.mysql.com/apt/ubuntu/ bionic mysql-5.7
+    
+    apt update
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys <错误ID>
+    apt-cache policy mysql-server
+    
+    apt install mysql-client=5.7.40-1ubuntu18.04
+    apt install mysql-server=5.7.40-1ubuntu18.04
+    
+    systemctl enable mysql
+    systemctl start mysql
+    
+    开启远程访问:
+    vim /etc/mysql/mysql.conf.d/mysqld.conf
+    bind-address = 0.0.0.0
+    character-set-server=utf8mb4
+    vim /etc/mysql/conf.d/mysql.conf
+    default-character-set=utf8mb4
+    
+    mysql -uroot -p
+    GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' identified by '密码' WITH GRANT OPTION;
+    flush tables;
+    flush privileges;
+    ```
+
+    
+
+23. 
 
